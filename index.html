@@ -89,7 +89,6 @@
     background: var(--panel2);
   }
   .q-btn.answered { background: rgba(0,230,118,0.15); border-color: var(--success); color: #a7f3d0; }
-  .q-btn.current { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245,197,24,0.3); }
 
   .option {
     display: flex;
@@ -125,6 +124,23 @@
   .feedback-item.wrong { background: rgba(255,82,82,0.1); border: 1px solid var(--danger); }
 
   .footer { text-align: center; font-size: 0.8rem; color: var(--muted); margin-top: 24px; }
+
+  /* Protection overlay */
+  #protection-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #001433;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px;
+  }
+  #protection-overlay.show { display: flex; }
+  #protection-overlay h2 { color: var(--gold); margin-bottom: 12px; }
+  #protection-overlay p { color: var(--muted); max-width: 320px; }
 </style>
 </head>
 <body oncontextmenu="return false;">
@@ -137,11 +153,11 @@
       <p>Mathematics in the Modern World<br>Chapter 2: The Language of Mathematics</p>
       <p style="margin-top:16px;">Enter your details to begin the 50-item assessment.</p>
       
-      <label style="display:block;margin-bottom:4px;color:var(--muted);font-size:0.9rem;">Full Name (Last Name, First Name M.I.)</label>
-      <input type="text" id="student-name" placeholder="e.g. Dela Cruz, Juan B." maxlength="40">
+      <label style="display:block;margin-bottom:4px;color:var(--muted);font-size:0.9rem;">Full Name</label>
+      <input type="text" id="student-name" placeholder="e.g. Juan Dela Cruz" maxlength="40">
       
       <label style="display:block;margin-bottom:4px;color:var(--muted);font-size:0.9rem;">Section</label>
-      <input type="text" id="student-section" placeholder="e.g. 1B Mech" maxlength="20">
+      <input type="text" id="student-section" placeholder="e.g. BSIT 1A" maxlength="20">
       
       <div class="btn-group">
         <button class="btn" id="btn-start">Start Assessment</button>
@@ -166,7 +182,7 @@
 
   <!-- SINGLE QUESTION -->
   <div id="screen-question" class="screen">
-    <div class="card">
+    <div class="card" id="question-card">
       <p id="q-progress" style="color:var(--muted);font-size:0.9rem;margin-bottom:8px;"></p>
       <h2 id="q-text"></h2>
       <div id="q-options"></div>
@@ -197,12 +213,19 @@
 
 </div>
 
+<!-- PROTECTION OVERLAY -->
+<div id="protection-overlay">
+  <h2>⚠️ Please return to the quiz</h2>
+  <p>The question has been hidden because you left the page or switched apps.<br><br>
+  Tap the button below to continue.</p>
+  <button class="btn" style="margin-top:20px;" onclick="revealQuestion()">I am back – Show Question</button>
+</div>
+
 <script>
 /* ============================================================
    ANTI-CHEAT
    ============================================================ */
 document.addEventListener('keydown', function(e) {
-  // Block Ctrl+C, Ctrl+A, Ctrl+X, Ctrl+S, Ctrl+P, Ctrl+F, F12, Ctrl+Shift+I
   if (e.ctrlKey && ['c','a','x','s','p','f','u'].includes(e.key.toLowerCase())) {
     e.preventDefault();
     return false;
@@ -216,6 +239,32 @@ document.addEventListener('keydown', function(e) {
 document.addEventListener('copy', e => e.preventDefault());
 document.addEventListener('cut', e => e.preventDefault());
 document.addEventListener('selectstart', e => e.preventDefault());
+
+/* ============================================================
+   HIDE QUESTION WHEN STUDENT LEAVES THE PAGE
+   ============================================================ */
+function hideQuestion() {
+  // Only hide if we are currently on the question screen
+  if (document.getElementById('screen-question').classList.contains('active')) {
+    document.getElementById('protection-overlay').classList.add('show');
+  }
+}
+
+function revealQuestion() {
+  document.getElementById('protection-overlay').classList.remove('show');
+}
+
+// Detect when user leaves the page / switches app
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) {
+    hideQuestion();
+  }
+});
+
+// Also detect when window loses focus
+window.addEventListener('blur', function() {
+  hideQuestion();
+});
 
 /* ============================================================
    70-QUESTION BANK
@@ -296,11 +345,11 @@ const TEST_BANK = [
 /* ============================================================
    STATE & DETERMINISTIC SELECTION
    ============================================================ */
-const STORAGE_KEY = 'mmw_quiz50_v1';
+const STORAGE_KEY = 'mmw_quiz50_v2';
 let state = {
   name: '',
   section: '',
-  answers: Array(50).fill(null),   // student's choices
+  answers: Array(50).fill(null),
   submitted: false
 };
 
@@ -461,7 +510,7 @@ document.getElementById('btn-save').onclick = saveAnswer;
 document.getElementById('btn-skip').onclick = skipQuestion;
 document.getElementById('btn-submit-all').onclick = submitAssessment;
 
-// Restore if already started (optional)
+// Restore if already started
 const saved = localStorage.getItem(STORAGE_KEY);
 if (saved) {
   try {
